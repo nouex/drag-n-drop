@@ -8,60 +8,8 @@
 
 let dragNDrop =
 (function factoryIIFE(window) {
-  const targets = [],
-        activeTargets = []
-
-  document.addEventListener("mousedown", function (event) {
-    targets.forEach((triple) => {
-      let target = triple[0], pos = triple[1]
-
-      if (event.target === target) {
-        document.documentElement.addEventListener("mousemove", onMouseMove, false)
-        activeTargets.push(triple)
-      }
-    })
-  }, false)
-
-  document.addEventListener("mouseup", function (event) {
-    activeTargets.forEach((triple, ind) => {
-      document.documentElement.removeEventListener("mousemove", onMouseMove)
-    })
-    activeTargets.splice(0, activeTargets.length)
-
-  }, false)
-
-  function onMouseMove(event) {
-    // find pos
-    activeTargets.forEach((triple) => {
-      let target = triple[0],
-          pos = triple[1],
-          boundary = triple[2]
-
-      if (!pos.isInElement(boundary)) return
-
-      let xDelta = event.pageX - pos.x
-      let yDelta = event.pageY - pos.y
-      let cssStyleDec = window.getComputedStyle(target)
-      let offsetX = (Number(cssStyleDec.left.slice(0, cssStyleDec.left.length -2)) + xDelta)
-      let offsetY = (Number(cssStyleDec.top.slice(0, cssStyleDec.top.length -2 ))+ yDelta)
-      let overflowX = offsetX + pxToInt(target.style.width)
-      let overflowY = offsetY + pxToInt(target.style.height)
-      let boundDomClient = boundary.getBoundingClientRect()
-
-      overflowX = offsetX + ~~boundDomClient.left < ~~boundDomClient.left || overflowX > pxToInt(boundary.style.width)
-      overflowY = offsetY + ~~boundDomClient.top < ~~boundDomClient.top || overflowY > pxToInt(boundary.style.height)
-
-
-      if (overflowX || overflowY) return
-
-      target.style.left = offsetX + "px"
-      target.style.top = offsetY + "px"
-    })
-  }
-
   function MousePosition () {
-    this.x = this.y = null
-    this.init(document)
+    this.x = this.y = this.oldX = this.oldY = null
   }
 
   MousePosition.prototype.release = function () {
@@ -73,6 +21,8 @@ let dragNDrop =
   };
 
   MousePosition.prototype._onMouseMove = function (event) {
+    this.oldX = this.x
+    this.oldY = this.y
     this.x = event.pageX
     this.y = event.pageY
   }
@@ -95,10 +45,148 @@ let dragNDrop =
     return parseInt(str.split(/px/i)[0])
   }
 
+  function Register() {
+    this.items = []
+  }
+
+  Register.prototype.hasTarget = function (target) {
+    let result = -1
+    this.items.some((item, ind) => {
+      if (item.target === target) {
+        // exit loop and return ind
+        result = ind
+        return true
+      }
+    })
+    return result
+  };
+
+  Register.prototype.findByTarget = function (target) {
+    let ret = null,
+        ind
+
+    // FIXME: lots of parenthesis to avoid precedence errors
+    if (~(ind = this.hasTarget(target))) {
+      ret = this.items[ind]
+    }
+
+    return ret
+  };
+
+  Register.prototype.add = function (item) {
+    this.items.push(item)
+  };
+
+  Register.prototype.remove = function (item) {
+    let items = this.items, ind
+    ind = items.indexOf(item)
+    if (~ind) throw new Error("item not in register")
+    // todo: is this how you deleete??
+    this.items.splice(ind, 1)
+  };
+
+  Register.prototype.forEachOnMouseUp = function (fn, cxt) {
+    this.items.forEach((item) => {
+      fn.call(cxt, item.onMouseUp)
+    })
+  };
+
+  Register.prototype.forEachOnMouseMove = function (fn, cxt) {
+    this.items.forEach((item) => {
+      fn.call(cxt, item.onMouseMove)
+    })
+  };
+
+  let targets, docOnMouseMove, docOnMouseUp, pos, register
+
+  pos = new MousePosition
+
+  // represents registered targets and their handlers
+  register = new Register
+
+  // TODO: if all onMouseMove() in register are inactive should we remove this
+  // listener? The cost would be keeping track of how many (if all) are inactive
+  function onMouseMove (event) {
+    register.forEachOnMouseMove(handler => handler.active ? handler(event) : void(0))
+  }
+
+  function onMouseUp (event) {
+    register.forEachOnMouseUp(handler => handler())
+  }
+
+  function init() {
+    pos.init(document)
+
+    document.addEventListener("mousemove", onMouseMove, false)
+    document.addEventListener("mouseup", onMouseUp, false)
+  }
+
+  function release() {
+    pos.release()
+
+    document.removeEventListener("mousemove", onMouseMove, false)
+    document.removeEventListener("mouseup", onMouseUp, false)
+  }
+
   // TODO: bility to change the boundary of a registered target
   return function (target, boundary) {
-    if (~targets.indexOf(target)) return;
-    targets.push([target, new MousePosition, boundary])
+    if (~register.hasTarget(target)) return;
+
+    targetInit()
+    register.items.length === 1 ? init() : void(0)
+
+    function targetInit() {
+      register.add({
+        target,
+        onMouseMove,
+        onMouseUp
+      })
+
+      target.addEventListener("mousedown", function onMouseDown(event) {
+        onMouseMove.active = true
+      }, false)
+    }
+
+    function onMouseUp() {
+      onMouseMove.active = false
+    }
+
+    onMouseMove.active = null
+    function onMouseMove(event) {
+
+        if (!pos.isInElement(boundary)) return
+
+        // wait for next round so we can produce a delta
+        if (pos.oldX === null && pos.oldY === null) return
+
+        let xDelta = pos.x - pos.oldX
+        let yDelta = pos.y - pos.oldY
+        let cssStyleDec = window.getComputedStyle(target)
+        let boundCssStyleDec = window.getComputedStyle(boundary)
+        // TODO: use pxToInt()
+        let offsetX = (Number(cssStyleDec.left.slice(0, cssStyleDec.left.length -2)) + xDelta)
+        let offsetY = (Number(cssStyleDec.top.slice(0, cssStyleDec.top.length -2 ))+ yDelta)
+        let overflowX = offsetX + pxToInt(cssStyleDec.width)
+        let overflowY = offsetY + pxToInt(cssStyleDec.height)
+        let boundDomClient = boundary.getBoundingClientRect()
+
+        overflowX = offsetX + ~~boundDomClient.left < ~~boundDomClient.left || overflowX > pxToInt(boundCssStyleDec.width)
+        overflowY = offsetY + ~~boundDomClient.top < ~~boundDomClient.top || overflowY > pxToInt(boundCssStyleDec.height)
+
+        if (overflowX || overflowY) return
+
+        target.style.left = offsetX + "px"
+        target.style.top = offsetY + "px"
+    }
+
+    return function targetRelease() {
+      let item = register.findByTarget(target)
+      if (item === null) throw new Error("target to be removed not found")
+      register.remove(item)
+      target.removeEventListener("mousedown", onMouseDown, false)
+
+      if (register.items.length === 0) release()
+    }
   }
 
 }(window))

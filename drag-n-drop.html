@@ -6,15 +6,175 @@
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>Document</title>
   <script src="./drag-n-drop.js"></script>
+  <style>
+    /* simple reset */
+    input {
+      display: block;
+    }
+
+
+    /* document-specific styles */
+
+    form {
+      margin-bottom: 20px;
+    }
+
+    .cont {
+      margin: 0;
+      position: relative;
+      border: 1px solid black;
+    }
+
+    #foo-cont {
+      height: 300px;
+      width: 400px;
+    }
+
+    #bar-cont {
+      height: 600px;
+      width: 800px;
+      box-sizing: border-box;
+      padding: 200px
+    }
+
+    .box {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      border: 1px solid black;
+    }
+
+    .circle {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      border: 1px solid black;
+      border-radius: 50%
+    }
+
+    .foo {
+      top: 0px;
+      background-color: blue;
+      opacity: 0.6;
+    }
+
+    .bar {
+      top: 0px;
+      background-color: red;
+      opacity: 0.6;
+    }
+  </style>
 </head>
 <body>
-<div id="cont" style="width: 500px; height: 300px; margin: 0; border: 1px solid black; position: relative">
-  <div id="foo" style="border: 1px solid black; width: 100px; height: 100px;top:0;left:0;position:absolute"></div>
-  <div id="bar" style="border: 1px solid black; width: 100px; height: 100px;top:0;left:102px;position:absolute"></div>
-</div>
+  <form action="">
+    <h2>Enter the # of items</h2>
+    <label for="inp1">blue squares:</label>
+    <input id="inp1" type="number" min="1" max="2" value="1">
+    <label for="inp2">red squares:</label>
+    <input id="inp2" type="number" min="1" max="5" value="1">
+    <label for="inp3">blue circles:</label>
+    <input id="inp3" type="number" min="1" max="2" value="1">
+    <label for="inp4">red circles:</label>
+    <input id="inp4" type="number" min="1" max="5" value="1">
+    <button type="submit">Go!</button>
+  </form>
+  <div id="bar-cont" class="cont">
+    <div id="foo-cont" class="cont">
+    </div>
+  </div>
 </body>
 <script type="text/javascript">
-  dragNDrop(document.getElementById("foo"), document.getElementById("cont"))
-  dragNDrop(document.getElementById("bar"), document.getElementById("cont"))
+  document.querySelector("button[type=\"submit\"]").
+    onclick = function (event) {
+      event.preventDefault()
+      let col = ["red", "blue"],
+          shape = ["square", "square", "circle", "circle"],
+          widthOffset = 102, // width + border width
+          widthOffsetFoo = 0,
+          widthOffsetBar = 0,
+          fooCont,
+          barCont = document.getElementById("bar-cont"),
+          value,
+          map
+
+      // clear of any previous injected elements
+      // FIXME: drawback with using it his way is that now we have two places
+      // where we must update te html if we want to change classes id of it
+      // NOTE: this line msut appear before the retrieve the element
+      barCont.innerHTML = "<div id=\"foo-cont\" class=\"cont\">"
+      fooCont = document.getElementById("foo-cont")
+
+      map = {
+        col: {
+          blue: "foo",
+          red: "bar"
+        },
+        shape: {
+          circle: "circle",
+          square: "box"
+        },
+        par: {
+          foo: fooCont,
+          bar: barCont
+        },
+        offset: {
+          foo: widthOffsetFoo,
+          bar: widthOffsetBar
+        }
+      }
+
+      for (let i = 1; i <= 4; i++) {
+        let id = "inp" + i,
+            currShape = shape[i -1],
+            currCol = col[i % 2],
+            colId = map.col[currCol],
+            par = map.par[colId],
+            finalShape = map.shape[currShape],
+            finalCol = map.col[currCol]
+
+        value = document.getElementById(id).value
+        value = ~~(value)
+
+        switch (colId) {
+          case "bar":
+            if (value > 4) {
+              alert(`big cont cannot exceed 4 items`)
+              return
+            }
+            else if (value < 0){
+               alert("must be positive value")
+              return
+            }
+            break;
+
+          case "foo":
+            if (value > 2) {
+              alert("small cont cnannot exceed 2 items")
+              return;
+            }
+            else if (value < 0) {
+              alert("must be positive")
+              return
+            }
+            break;
+        }
+
+        for (let i = 0; i < value; i++) {
+          // TODO: use a DocumentFragment
+          let el = document.createElement("div"),
+              offset = map.offset[colId]
+
+          // decorate with classes
+          el.classList.add(colId)
+          el.classList.add(finalShape)
+          el.style.left = offset + "px"
+          // NOTE: simple value must be accessed via object cause simple values
+          // copy, they dont' ref
+          map.offset[colId] += widthOffset
+          dragNDrop(el, par)
+          par.append(el)
+        }
+      }
+    };
 </script>
 </html>
