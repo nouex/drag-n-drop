@@ -23,8 +23,8 @@ let dragNDrop =
   MousePosition.prototype._onMouseMove = function (event) {
     this.oldX = this.x
     this.oldY = this.y
-    this.x = event.pageX
-    this.y = event.pageY
+    this.x = event.clientX
+    this.y = event.clientY
   }
 
   // inside as in content width and padding width
