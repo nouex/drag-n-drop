@@ -87,7 +87,7 @@ let dragNDrop =
 
   Register.prototype.forEachOnMouseUp = function (fn, cxt) {
     this.items.forEach((item) => {
-      fn.call(cxt, item.onMouseUp)
+      fn.call(cxt, item.onMouseUp.bind(item.target, item.origOpacity))
     })
   };
 
@@ -111,7 +111,7 @@ let dragNDrop =
   }
 
   function onMouseUp (event) {
-    register.forEachOnMouseUp(handler => handler())
+    register.forEachOnMouseUp(handler => handler(), this)
   }
 
   function init() {
@@ -136,19 +136,25 @@ let dragNDrop =
     register.items.length === 1 ? init() : void(0)
 
     function targetInit() {
+      let origOpacity = window.getComputedStyle(target).opacity
+
       register.add({
         target,
         onMouseMove,
-        onMouseUp
+        onMouseUp,
+        origOpacity
       })
 
       target.addEventListener("mousedown", function onMouseDown(event) {
         onMouseMove.active = true
+        this.style.opacity = (+origOpacity) / 2
       }, false)
     }
 
-    function onMouseUp() {
+    function onMouseUp(origOpacity) {
       onMouseMove.active = false
+      // todo: this.style.opacity = origOpacity
+      this.style.opacity = origOpacity
     }
 
     onMouseMove.active = null

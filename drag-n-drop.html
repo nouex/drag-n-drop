@@ -171,8 +171,10 @@
           // NOTE: simple value must be accessed via object cause simple values
           // copy, they dont' ref
           map.offset[colId] += widthOffset
-          dragNDrop(el, par)
+          // TIL: css styles are not applied until the element part of doc tree
           par.append(el)
+          dragNDrop(el, par)
+
         }
       }
     };
